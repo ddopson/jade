@@ -457,22 +457,14 @@ Compiler.prototype = {
     var fn = filters[filter.name];
 
     // unknown filter
-    if (!fn) {
-      if (filter.isASTFilter) {
-        throw new Error('unknown ast filter "' + filter.name + ':"');
-      } else {
-        throw new Error('unknown filter ":' + filter.name + '"');
-      }
-    }
+    if (!fn) throw new Error('unknown filter ":' + filter.name + '"');
 
-    if (filter.isASTFilter) {
-      this.buf.push(fn(filter.block, this, filter.attrs));
-    } else {
-      var text = filter.block.nodes.map(function(node){ return node.val }).join('\n');
-      filter.attrs = filter.attrs || {};
-      filter.attrs.filename = this.options.filename;
-      this.buffer(utils.text(fn(text, filter.attrs)));
-    }
+    var text = filter.block.nodes.map(
+      function(node){ return node.val; }
+    ).join('\n');
+    filter.attrs = filter.attrs || {};
+    filter.attrs.filename = this.options.filename;
+    this.buffer(utils.text(fn(text, filter.attrs)));
   },
 
   /**
@@ -653,11 +645,11 @@ Compiler.prototype = {
 
     if (classes.length) {
       classes = classes.join(" + ' ' + ");
-      buf.push("class: " + classes);
+      buf.push('"class": ' + classes);
     }
 
     return {
-      buf: buf.join(', ').replace('class:', '"class":'),
+      buf: buf.join(', '),
       escaped: JSON.stringify(escaped),
       inherits: inherits,
       constant: constant
@@ -737,95 +729,104 @@ require.register("filters.js", function(module, exports, require){
  * MIT Licensed
  */
 
-module.exports = {
-  
-  /**
-   * Wrap text with CDATA block.
-   */
-  
-  cdata: function(str){
-    return '<![CDATA[\\n' + str + '\\n]]>';
-  },
-  
-  /**
-   * Transform sass to css, wrapped in style tags.
-   */
-  
-  sass: function(str){
-    str = str.replace(/\\n/g, '\n');
-    var sass = require('sass').render(str).replace(/\n/g, '\\n');
-    return '<style type="text/css">' + sass + '</style>'; 
-  },
-  
-  /**
-   * Transform stylus to css, wrapped in style tags.
-   */
-  
-  stylus: function(str, options){
-    var ret;
-    str = str.replace(/\\n/g, '\n');
-    var stylus = require('stylus');
-    stylus(str, options).render(function(err, css){
-      if (err) throw err;
-      ret = css.replace(/\n/g, '\\n');
-    });
-    return '<style type="text/css">' + ret + '</style>'; 
-  },
-  
-  /**
-   * Transform less to css, wrapped in style tags.
-   */
-  
-  less: function(str){
-    var ret;
-    str = str.replace(/\\n/g, '\n');
-    require('less').render(str, function(err, css){
-      if (err) throw err;
-      ret = '<style type="text/css">' + css.replace(/\n/g, '\\n') + '</style>';  
-    });
-    return ret;
-  },
-  
-  /**
-   * Transform markdown to html.
-   */
-  
-  markdown: function(str){
-    var md;
+/**
+ * Wrap text with CDATA block.
+ */
 
-    // support markdown / discount
+exports.cdata = function(str){
+  return '<![CDATA[\\n' + str + '\\n]]>';
+};
+
+/**
+ * Wrap text in script tags.
+ */
+
+exports.js = function(str){
+  return '<script>' + str + '</script>';
+};
+
+/**
+ * Wrap text in style tags.
+ */
+
+exports.css = function(str){
+  return '<style>' + str + '</style>';
+};
+
+/**
+ * Transform stylus to css, wrapped in style tags.
+ */
+
+exports.stylus = function(str, options){
+  var ret;
+  str = str.replace(/\\n/g, '\n');
+  var stylus = require('stylus');
+  stylus(str, options).render(function(err, css){
+    if (err) throw err;
+    ret = css.replace(/\n/g, '\\n');
+  });
+  return '<style type="text/css">' + ret + '</style>';
+};
+
+/**
+ * Transform less to css, wrapped in style tags.
+ */
+
+exports.less = function(str){
+  var ret;
+  str = str.replace(/\\n/g, '\n');
+  require('less').render(str, function(err, css){
+    if (err) throw err;
+    ret = '<style type="text/css">' + css.replace(/\n/g, '\\n') + '</style>';
+  });
+  return ret;
+};
+
+/**
+ * Transform markdown to html.
+ */
+
+exports.markdown = function(str){
+  var md;
+
+  // support markdown / discount
+  try {
+    md = require('markdown');
+  } catch (err){
     try {
-      md = require('markdown');
-    } catch (err){
+      md = require('discount');
+    } catch (err) {
       try {
-        md = require('discount');
+        md = require('markdown-js');
       } catch (err) {
         try {
-          md = require('markdown-js');
+          md = require('marked');
         } catch (err) {
-          try {
-            md = require('marked');
-          } catch (err) {
-            throw new
-              Error('Cannot find markdown library, install markdown, discount, or marked.');
-          }
+          throw new
+            Error('Cannot find markdown library, install markdown, discount, or marked.');
         }
       }
     }
-
-    str = str.replace(/\\n/g, '\n');
-    return md.parse(str).replace(/\n/g, '\\n').replace(/'/g,'&#39;');
-  },
-  
-  /**
-   * Transform coffeescript to javascript.
-   */
-
-  coffeescript: function(str){
-    var js = require('coffee-script').compile(str).replace(/\\/g, '\\\\').replace(/\n/g, '\\n');
-    return '<script type="text/javascript">\\n' + js + '</script>';
   }
+
+  str = str.replace(/\\n/g, '\n');
+  return md.parse(str).replace(/\n/g, '\\n').replace(/'/g,'&#39;');
 };
+
+/**
+ * Transform coffeescript to javascript.
+ */
+
+exports.coffeescript = function(str){
+  var js = require('coffee-script').compile(str).replace(/\\/g, '\\\\').replace(/\n/g, '\\n');
+  return '<script type="text/javascript">\\n' + js + '</script>';
+};
+
+// aliases
+
+exports.md = exports.markdown;
+exports.styl = exports.stylus;
+exports.coffee = exports.coffeescript;
 
 }); // module: filters.js
 
@@ -880,7 +881,7 @@ var Parser = require('./parser')
  * Library version.
  */
 
-exports.version = '0.27.6';
+exports.version = '0.28.0';
 
 /**
  * Expose self closing tags.
@@ -973,7 +974,7 @@ function parse(str, options){
       + 'return buf.join("");';
   } catch (err) {
     parser = parser.context();
-    runtime.rethrow(err, parser.filename, parser.lexer.lineno);
+    runtime.rethrow(err, parser.filename, parser.lexer.lineno, str);
   }
 }
 
@@ -1291,7 +1292,6 @@ Lexer.prototype = {
     var captures;
     if (captures = /^\n *\n/.exec(this.input)) {
       this.consume(captures[0].length - 1);
-
       ++this.lineno;
       if (this.pipeless) return this.tok('text', '');
       return this.next();
@@ -2361,7 +2361,7 @@ var Node = require('./node')
   , Block = require('./block');
 
 /**
- * Initialize a `Filter` node with the given 
+ * Initialize a `Filter` node with the given
  * filter `name` and `block`.
  *
  * @param {String} name
@@ -2373,7 +2373,6 @@ var Filter = module.exports = function Filter(name, block, attrs) {
   this.name = name;
   this.block = block;
   this.attrs = attrs;
-  this.isASTFilter = !block.nodes.every(function(node){ return node.isText });
 };
 
 /**
@@ -2673,7 +2672,10 @@ require.register("parser.js", function(module, exports, require){
 
 var Lexer = require('./lexer')
   , nodes = require('./nodes')
-  , utils = require('./utils');
+  , utils = require('./utils')
+  , filters = require('./filters')
+  , path = require('path')
+  , extname = path.extname;
 
 /**
  * Initialize `Parser` with the given input `str` and `filename`.
@@ -2740,29 +2742,29 @@ Parser.prototype = {
   skip: function(n){
     while (n--) this.advance();
   },
-  
+
   /**
    * Single token lookahead.
    *
    * @return {Object}
    * @api private
    */
-  
+
   peek: function() {
     return this.lookahead(1);
   },
-  
+
   /**
    * Return lexer lineno.
    *
    * @return {Number}
    * @api private
    */
-  
+
   line: function() {
     return this.lexer.lineno;
   },
-  
+
   /**
    * `n` token lookahead.
    *
@@ -2770,18 +2772,18 @@ Parser.prototype = {
    * @return {Object}
    * @api private
    */
-  
+
   lookahead: function(n){
     return this.lexer.lookahead(n);
   },
-  
+
   /**
    * Parse input returning a string of js for evaluation.
    *
    * @return {String}
    * @api public
    */
-  
+
   parse: function(){
     var block = new nodes.Block, parser;
     block.line = this.line();
@@ -2806,14 +2808,14 @@ Parser.prototype = {
 
     return block;
   },
-  
+
   /**
    * Expect the given type, or throw an exception.
    *
    * @param {String} type
    * @api private
    */
-  
+
   expect: function(type){
     if (this.peek().type === type) {
       return this.advance();
@@ -2821,20 +2823,20 @@ Parser.prototype = {
       throw new Error('expected "' + type + '", but got "' + this.peek().type + '"');
     }
   },
-  
+
   /**
    * Accept the given `type`.
    *
    * @param {String} type
    * @api private
    */
-  
+
   accept: function(type){
     if (this.peek().type === type) {
       return this.advance();
     }
   },
-  
+
   /**
    *   tag
    * | doctype
@@ -2850,7 +2852,7 @@ Parser.prototype = {
    * | class
    * | interpolation
    */
-  
+
   parseExpr: function(){
     switch (this.peek().type) {
       case 'tag':
@@ -2900,11 +2902,11 @@ Parser.prototype = {
         throw new Error('unexpected token "' + this.peek().type + '"');
     }
   },
-  
+
   /**
    * Text
    */
-  
+
   parseText: function(){
     var tok = this.expect('text')
       , node = new nodes.Text(tok.val);
@@ -2946,7 +2948,7 @@ Parser.prototype = {
     var val = this.expect('when').val
     return new nodes.Case.When(val, this.parseBlockExpansion());
   },
-  
+
   /**
    * default
    */
@@ -2959,7 +2961,7 @@ Parser.prototype = {
   /**
    * code
    */
-  
+
   parseCode: function(){
     var tok = this.expect('code')
       , node = new nodes.Code(tok.val, tok.buffer, tok.escape)
@@ -2974,11 +2976,11 @@ Parser.prototype = {
     }
     return node;
   },
-  
+
   /**
    * comment
    */
-  
+
   parseComment: function(){
     var tok = this.expect('comment')
       , node;
@@ -2992,22 +2994,22 @@ Parser.prototype = {
     node.line = this.line();
     return node;
   },
-  
+
   /**
    * doctype
    */
-  
+
   parseDoctype: function(){
     var tok = this.expect('doctype')
       , node = new nodes.Doctype(tok.val);
     node.line = this.line();
     return node;
   },
-  
+
   /**
    * filter attrs? text-block
    */
-  
+
   parseFilter: function(){
     var block
       , tok = this.expect('filter')
@@ -3021,28 +3023,11 @@ Parser.prototype = {
     node.line = this.line();
     return node;
   },
-  
-  /**
-   * tag ':' attrs? block
-   */
-  
-  parseASTFilter: function(){
-    var block
-      , tok = this.expect('tag')
-      , attrs = this.accept('attrs');
 
-    this.expect(':');
-    block = this.block();
-
-    var node = new nodes.Filter(tok.val, block, attrs && attrs.attrs);
-    node.line = this.line();
-    return node;
-  },
-  
   /**
    * each block
    */
-  
+
   parseEach: function(){
     var tok = this.expect('each')
       , node = new nodes.Each(tok.code, tok.val, tok.key);
@@ -3140,14 +3125,17 @@ Parser.prototype = {
 
     // non-jade
     if ('.jade' != path.substr(-5)) {
-      var path = join(dir, path)
-        , str = fs.readFileSync(path, 'utf8');
+      var path = join(dir, path);
+      var str = fs.readFileSync(path, 'utf8');
+      var ext = extname(path).slice(1);
+      var filter = filters[ext];
+      if (filter) str = filter(str);
       return new nodes.Literal(str);
     }
 
-    var path = join(dir, path)
-      , str = fs.readFileSync(path, 'utf8')
-     , parser = new Parser(str, path, this.options);
+    var path = join(dir, path);
+    var str = fs.readFileSync(path, 'utf8');
+    var parser = new Parser(str, path, this.options);
     parser.blocks = utils.merge({}, this.blocks);
     parser.mixins = this.mixins;
 
@@ -3234,7 +3222,7 @@ Parser.prototype = {
   /**
    * indent expr* outdent
    */
-  
+
   block: function(){
     var block = new nodes.Block;
     block.line = this.line();
@@ -3253,7 +3241,7 @@ Parser.prototype = {
   /**
    * interpolation (attrs | class | id)* (text | code | ':')? newline* block?
    */
-  
+
   parseInterpolation: function(){
     var tok = this.advance();
     var tag = new nodes.Tag(tok.val);
@@ -3264,16 +3252,11 @@ Parser.prototype = {
   /**
    * tag (attrs | class | id)* (text | code | ':')? newline* block?
    */
-  
+
   parseTag: function(){
     // ast-filter look-ahead
     var i = 2;
     if ('attrs' == this.lookahead(i).type) ++i;
-    if (':' == this.lookahead(i).type) {
-      if ('indent' == this.lookahead(++i).type) {
-        return this.parseASTFilter();
-      }
-    }
 
     var tok = this.advance()
       , tag = new nodes.Tag(tok.val);
@@ -3371,7 +3354,7 @@ Parser.prototype = {
         }
       }
     }
-    
+
     return tag;
   }
 };
@@ -3529,11 +3512,13 @@ exports.escape = function escape(html){
  * @api private
  */
 
-exports.rethrow = function rethrow(err, filename, lineno){
-  if (!filename) throw err;
+exports.rethrow = function rethrow(err, filename, lineno, str){
+  if (!str) {
+    if (!filename) throw err;
+    str = require('fs').readFileSync(filename, 'utf8')
+  }
 
   var context = 3
-    , str = require('fs').readFileSync(filename, 'utf8')
     , lines = str.split('\n')
     , start = Math.max(lineno - context, 0)
     , end = Math.min(lines.length, lineno + context);
