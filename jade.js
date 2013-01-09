@@ -588,7 +588,7 @@ Compiler.prototype = {
     ).join('\n');
     filter.attrs = filter.attrs || {};
     filter.attrs.filename = this.options.filename;
-    this.buffer(utils.text(fn(text, filter.attrs)));
+    this.buffer(utils.text(fn(text, filter.attrs), this.options.coffee));
   },
 
   /**
@@ -599,7 +599,7 @@ Compiler.prototype = {
    */
 
   visitText: function(text){
-    text = utils.text(text.val.replace(/\\/g, '_SLASH_'));
+    text = utils.text(text.val.replace(/\\/g, '_SLASH_'), this.options.coffee);
     if (this.escape) text = escape(text);
     text = text.replace(/_SLASH_/g, '\\\\');
     this.buffer(text);
@@ -1189,7 +1189,7 @@ exports.compile = function(str, options){
           '__jade = [{ lineno: 1, filename: ' + filename + ' }];'
         , 'try'
         , parse(str, options).replace(/^/gm, '  ')
-        , 'catch (err)'
+        , 'catch err'
         , '  rethrow(err, __jade[0].filename, __jade[0].lineno);'
         , ''
       ].join('\n');
@@ -3767,7 +3767,7 @@ require.register("utils.js", function(module, exports, require){
  * @api private
  */
 
-var interpolate = exports.interpolate = function(str){
+var interpolate = exports.interpolate = function(str, coffee){
   return str.replace(/(_SLASH_)?([#!]){(.*?)}/g, function(str, escape, flag, code){
     code = code
       .replace(/\\'/g, "'")
@@ -3777,8 +3777,9 @@ var interpolate = exports.interpolate = function(str){
       ? str.slice(7)
       : "' + "
         + ('!' == flag ? '' : 'escape')
-        + "((interp = " + code
-        + ") == null ? '' : interp) + '";
+        + (coffee
+          ? "((" + code + ") ? '') + '"
+          : "((interp = " + code + ") == null ? '' : interp) + '");
   });
 };
 
@@ -3802,8 +3803,8 @@ var escape = exports.escape = function(str) {
  * @api private
  */
 
-exports.text = function(str){
-  return interpolate(escape(str));
+exports.text = function(str, coffee){
+  return interpolate(escape(str), coffee);
 };
 
 /**
