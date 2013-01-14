@@ -10,21 +10,23 @@ var jade = require('../')
 
 // test cases
 
-function casesForExt(ext) {
-  return fs.readdirSync('test/cases').filter(function(file){
+function casesForExt(path, ext) {
+  return fs.readdirSync(path).filter(function(file){
     return file.match(ext)
   }).map(function(file){
-    return file.replace(ext, '')
+    return {
+      name: file.replace(ext, '').replace(/[-.]/g, ' '),
+      jade_path: path + '/' + file,
+      html_path: path + '/' + file.replace(ext, '.html'),
+    }
   });
 }
 
-casesForExt(/[.]jade$/).forEach(function(test){
-  var name = test.replace(/[-.]/g, ' ');
-  it(name, function(){
-    var path = 'test/cases/' + test + '.jade';
-    var str = fs.readFileSync(path, 'utf8');
-    var html = fs.readFileSync('test/cases/' + test + '.html', 'utf8').trim().replace(/\r/g, '');
-    var fn = jade.compile(str, { filename: path, pretty: true });
+casesForExt('test/cases', /[.]jade$/).forEach(function(test){
+  it(test.name, function(){
+    var str = fs.readFileSync(test.jade_path, 'utf8');
+    var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
+    var fn = jade.compile(str, { filename: test.jade_path, pretty: true });
     var actual = fn({ title: 'Jade' });
     actual.trim().should.equal(html);
   })
@@ -37,19 +39,16 @@ function lineify(str) {
   return str.replace(/^/mg, function () { return "" + ++n + "  "});
 }
 
-casesForExt(/[.]jadec$/).forEach(function(test){
-  var name = test.replace(/[-.]/g, ' ');
-  it(name, function(){
-    var path = 'test/cases/' + test + '.jadec';
-    var str = fs.readFileSync(path, 'utf8');
-    var html = fs.readFileSync('test/cases/' + test + '.html', 'utf8').trim().replace(/\r/g, '');
-    var coffee = jade.compile(str, { filename: path, pretty: true, coffee: true });
+casesForExt('test/coffee_cases', /[.]jadec$/).forEach(function(test){
+  it(test.name, function(){
+    var str = fs.readFileSync(test.jade_path, 'utf8');
+    var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
+    var coffee = jade.compile(str, { filename: test.jade_path, pretty: true, coffee: true });
     var n = 0;
     var js
     try {
       js = Coffee.compile(coffee, {bare: true})
       var ctx = vm.Script.createContext()
-      ctx.runtime = jade.runtime;
       var fn = vm.runInContext(js, ctx)
       var rt = jade.runtime;
       var actual = fn({ title: 'Jade', interpolated: 'blah blah' }, rt.attrs, rt.escape, rt.rethrow, rt.merge);
