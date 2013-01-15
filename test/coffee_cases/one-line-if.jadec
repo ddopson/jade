@@ -1,0 +1,13 @@
+- method = (msg)-> msg+msg
+- conditional_a = true
+- conditional_b = null
+tag1
+  = method "stuff"  if conditional_a?
+tag2
+  = method "bar" if conditional_b?
+tag3
+  != method "stuff"  if conditional_a?
+tag4
+  != method "bar" if conditional_b?
+
+
