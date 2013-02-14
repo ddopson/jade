@@ -146,6 +146,8 @@ Compiler.prototype = {
           }
         } else if (el === UNINDENT) {
           indent--;
+        } else if (el.match(/__jade.unshift/)) {
+        } else if (el.match(/__jade.shift/)) {
         } else {
           if (i > 0) {
             content += "\n";
@@ -252,7 +254,7 @@ Compiler.prototype = {
     var debug = this.debug;
 
     if (debug) {
-      this.buf.push('__jade.unshift({ lineno: ' + node.line
+      this.buf.push('__jade.unshift({lineno: ' + node.line
         + ', filename: ' + (node.filename
           ? JSON.stringify(node.filename)
           : '__jade[0].filename')
@@ -261,7 +263,7 @@ Compiler.prototype = {
 
     // Massive hack to fix our context
     // stack for - else[ if] etc
-    if (false === node.debug && this.debug) {
+    if (false === node.debug && this.debug && !this.options.coffee) {
       this.buf.pop();
       this.buf.pop();
     }
@@ -279,8 +281,7 @@ Compiler.prototype = {
    */
 
   visitNode: function(node){
-    var name = node.constructor.name
-      || node.constructor.toString().match(/function ([^(\s]+)()/)[1];
+    var name = node.getType();
     return this['visit' + name](node);
   },
 
@@ -421,6 +422,9 @@ Compiler.prototype = {
       if (block || attrs.length) {
 
         this.buf.push(name + '.call({');
+        if (this.options.coffee) {
+          this.buf.push(INDENT)
+        }
 
         if (block) {
           if (this.options.coffee) {
@@ -439,7 +443,7 @@ Compiler.prototype = {
           this.parentIndents--;
 
           if (this.options.coffee) {
-            this.push(UNINDENT)
+            this.buf.push(UNINDENT)
             if (attrs.length) {
               this.buf.push('),');
             } else {
@@ -465,10 +469,11 @@ Compiler.prototype = {
         }
 
         if (this.options.coffee) {
+          this.buf.push(UNINDENT);
           if (args) {
-            this.buf.push('), ' + args + ');');
+            this.buf.push('}, ' + args + ');');
           } else {
-            this.buf.push('));');
+            this.buf.push('});');
           }
         } else {
           if (args) {
@@ -485,7 +490,8 @@ Compiler.prototype = {
     } else {
       if (this.options.coffee) {
         this.buf.push(name + ' = ((' + args + ') ->');
-        this.buf.push('block = @block, attributes = @attributes || {}, escaped = @escaped || {}');
+        this.buf.push(INDENT)
+        this.buf.push('block = @block; attributes = @attributes || {}; escaped = @escaped || {}');
       } else {
         this.buf.push('var ' + name + ' = function(' + args + '){');
         this.buf.push('var block = this.block, attributes = this.attributes || {}, escaped = this.escaped || {};');
@@ -494,6 +500,7 @@ Compiler.prototype = {
       this.visit(block);
       this.parentIndents--;
       if (this.options.coffee) {
+        this.buf.push(UNINDENT)
         this.buf.push(')');
       } else {
         this.buf.push('};');
@@ -651,34 +658,39 @@ Compiler.prototype = {
     // Wrap code blocks with {}.
     // we only wrap unbuffered code blocks ATM
     // since they are usually flow control
-
-    // Buffer code
-    if (code.buffer) {
-      var val = code.val.trimLeft();
-      if (this.options.coffee) {
-        this.buf.push('__val__ = ' + val);
-        val = 'if null == __val__ then "" else __val__';
-      } else {
-        this.buf.push('var __val__ = ' + val);
-        val = 'null == __val__ ? "" : __val__';
-      }
-      if (code.escape) val = 'escape(' + val + ')';
-      if (this.options.coffee) {
+    if (this.options.coffee) {
+      // Buffer code
+      if (code.buffer) {
+        this.buf.push('__val__ = (' + code.val.trimLeft() + ") ? ''");
+        var val = '__val__'
+        if (code.escape) {
+          val = 'escape(' + val + ')';
+        }
         this.buf.push("buf.push(" + val + ")");
       } else {
-        this.buf.push("buf.push(" + val + ");");
+        this.buf.push(code.val.trimLeft());
       }
-    } else {
-      this.buf.push(code.val);
-    }
 
-    // Block support
-    if (code.block) {
-      if (this.options.coffee) {
+      // Block support
+      if (code.block) {
         this.buf.push(INDENT);
         this.visit(code.block);
         this.buf.push(UNINDENT);
+      }
+    } else {
+      // Buffer code
+      if (code.buffer) {
+        var val = code.val.trimLeft();
+        this.buf.push('var __val__ = ' + val);
+        val = 'null == __val__ ? "" : __val__';
+        if (code.escape) val = 'escape(' + val + ')';
+        this.buf.push("buf.push(" + val + ");");
       } else {
+        this.buf.push(code.val.trimLeft());
+      }
+
+      // Block support
+      if (code.block) {
         if (!code.buffer) this.buf.push('{');
         this.visit(code.block);
         if (!code.buffer) this.buf.push('}');
@@ -695,10 +707,36 @@ Compiler.prototype = {
 
   visitEach: function(each){
     if (this.options.coffee) {
+      if (each.alternative) {
+        this.buf.push('$$_alt = true')
+      }
+      this.buf.push('if typeof ' + each.obj + ".length == 'number'");
+      this.buf.push(INDENT);
       this.buf.push('for ' + each.val + ',' + each.key + ' in ' + each.obj)
       this.buf.push(INDENT);
+      if (each.alternative) {
+        this.buf.push('$$_alt = false')
+      }
       this.visit(each.block);
       this.buf.push(UNINDENT);
+      this.buf.push(UNINDENT);
+      this.buf.push('else');
+      this.buf.push(INDENT);
+      this.buf.push('for ' + each.key + ',' + each.val + ' of ' + each.obj)
+      this.buf.push(INDENT);
+      if (each.alternative) {
+        this.buf.push('$$_alt = false')
+      }
+      this.visit(each.block);
+      this.buf.push(UNINDENT);
+      this.buf.push(UNINDENT);
+
+      if (each.alternative) {
+        this.buf.push('if $$_alt')
+        this.buf.push(INDENT);
+        this.visit(each.alternative);
+        this.buf.push(UNINDENT);
+      }
     } else {
       this.buf.push(''
         + '// iterate ' + each.obj + '\n'
@@ -1099,6 +1137,21 @@ exports.runtime = runtime;
 exports.cache = {};
 
 /**
+ * Parse the given `str` of jade and return an AST (Abstract Syntax Tree)
+ *
+ * @param {String} str
+ * @param {Object} options
+ * @return {Object}
+ * @api private
+ */
+
+exports.parse = function parseAST(str, options) {
+    // Parse
+    var parser = new Parser(str, options.filename, options);
+    return parser.parse();
+}
+
+/**
  * Parse the given `str` of jade and return a function body.
  *
  * @param {String} str
@@ -1111,9 +1164,9 @@ function parse(str, options){
   try {
     // Parse
     var parser = new Parser(str, options.filename, options);
-
+    var ast = parser.parse();
     // Compile
-    var compiler = new (options.compiler || Compiler)(parser.parse(), options)
+    var compiler = new (options.compiler || Compiler)(ast, options)
       , js = compiler.compile();
 
     // Debug compiler
@@ -1222,6 +1275,8 @@ exports.compile = function(str, options){
       ')'
     ].join('\n');
     // Coffee mode can't be run directly, only returned as a string
+  } else if (options.source) {
+    return fn;
   } else {
     fn = new Function('locals, attrs, escape, rethrow, merge', fn);
     if (client) return fn;
@@ -1326,6 +1381,7 @@ var utils = require('./utils');
 
 var Lexer = module.exports = function Lexer(str, options) {
   options = options || {};
+  this.coffee = options.coffee;
   this.input = str.replace(/\r\n|\r/g, '\n');
   this.colons = options.colons;
   this.deferredTokens = [];
@@ -1681,7 +1737,11 @@ Lexer.prototype = {
       this.consume(captures[0].length);
       var name = captures[1]
         , val = captures[2];
-      return this.tok('code', 'var ' + name + ' = (' + val + ');');
+      if(this.coffee) {
+        return this.tok('code', name + ' = (' + val + ')');
+      } else {
+        return this.tok('code', 'var ' + name + ' = (' + val + ');');
+      }
     }
   },
 
@@ -3164,6 +3224,46 @@ Node.prototype.clone = function(){
   return this;
 };
 
+Node.prototype.getType = function(){
+  if (! this._type) {
+    this._type = this.constructor.name || this.constructor.toString().match(/function ([^(\s]+)()/)[1];
+  }
+  return this._type;
+};
+
+Node.prototype.pretty = function() {
+  var type = this.getType();
+  var props = []
+  for (var key in this) {
+    if (this.hasOwnProperty(key)) {
+      var value = this[key];
+      if (['block', 'nodes'].indexOf(key) == -1) {
+        props.push( key + '=' + JSON.stringify(value))
+      }
+    }
+  }
+  var output =  type + ": " + props.join(', ')
+  if(this.block) {
+      output += "\n" + this.block.pretty()
+  }
+  if(this.nodes) {
+    output = '{';
+    for (var i in this.nodes) {
+      var node = this.nodes[i];
+      output += "\n" + node.pretty().replace(/^/gm, '  ')
+    }
+    output += "\n}"
+  }
+  return output
+
+// args, attrs, block, buffer, call, debug, escape, expr, key, name
+// block, nodes
+// obj
+// str
+// val
+
+};
+
 }); // module: nodes/node.js
 
 require.register("nodes/tag.js", function(module, exports, require){
@@ -3769,11 +3869,18 @@ Parser.prototype = {
 
     // no extension
     if (!~basename(path).indexOf('.')) {
-      path += '.jade';
+      if (fs.existsSync(join(dir, path + '.jade'))) {
+        path += '.jade';
+      } else if (fs.existsSync(join(dir, path + '.jadec'))) {
+        path += '.jadec';
+      } else {
+        // default back to .jade so the error will print with that path choice
+        path += '.jade';
+      }
     }
 
     // non-jade
-    if ('.jade' != path.substr(-5)) {
+    if ('.jade' != path.substr(-5) && '.jadec' != path.substr(-6)) {
       var path = join(dir, path);
       var str = fs.readFileSync(path, 'utf8');
       var ext = extname(path).slice(1);
