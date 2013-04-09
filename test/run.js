@@ -35,8 +35,8 @@ function casesForExt(path, ext) {
   });
 }
 
-casesForExt('test/cases', /[.]jade$/).forEach(function(test){
-  it(test.name, function(){
+casesForExt('test/cases', /[.]jade(js)?$/).forEach(function(test){
+  it("JadeJS: " + test.name, function(){
     try {
       var str = fs.readFileSync(test.jade_path, 'utf8');
       var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
@@ -54,7 +54,7 @@ casesForExt('test/cases', /[.]jade$/).forEach(function(test){
   })
 });
 
-casesForExt('test/coffee_cases', /[.]jadec$/).forEach(function(test){
+casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
   it("JadeC: " + test.name, function(){
     var str = fs.readFileSync(test.jade_path, 'utf8');
     var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
