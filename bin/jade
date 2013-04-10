@@ -28,9 +28,13 @@ program
   .option('-O, --out <dir>', 'output the compiled html to <dir>')
   .option('-p, --path <path>', 'filename used to resolve includes')
   .option('-C, --coffee', 'Compile in coffee syntax mode')
+  .option('-R, --rawdom', 'Compile in rawDOM syntax mode')
+  .option('-s, --stdout', 'Print output to stdout')
   .option('-P, --pretty', 'compile pretty html output')
   .option('-c, --client', 'compile function for client-side runtime.js')
   .option('-D, --no-debug', 'compile without debugging (smaller functions)')
+  .option('-x, --xml', 'Output well-formed xml.')
+  .option('--debug-ast', 'Output the parsed intermediate AST')
   .option('-w, --watch', 'watch files for changes and automatically re-render')
 
 program.on('--help', function(){
@@ -85,6 +89,14 @@ options.pretty = program.pretty;
 
 options.coffee = program.coffee;
 
+// --rawdom
+
+options.rawdom = program.rawdom;
+
+// --xml
+
+options.xml = program.xml;
+
 // --watch
 
 options.watch = program.watch;
@@ -122,12 +134,34 @@ function stdin() {
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', function(chunk){ buf += chunk; });
   process.stdin.on('end', function(){
-    var fn = jade.compile(buf, options);
-    var output = options.client
-        ? fn.toString()
-        : fn(options);
+    var output = getOutput(buf, options)
     process.stdout.write(output);
   }).resume();
+}
+
+function three_digits(n) {
+  if (n < 10) return "00" + n;
+  if (n < 100) return "0" + n;
+  return "" + n;
+}
+
+function lineify(str, prefix) {
+  var n = 0;
+  prefix = prefix || '';
+  if (!(typeof str == 'string')) return str
+  return str.replace(/^/mg, function () { return prefix + three_digits(++n) + "  "});
+}
+
+function getOutput(str, options) {
+  var fn = jade.compile(str, options);
+  var output = options.client
+    ? fn.toString()
+    : fn(options);
+  if (program.debugAst) {
+    var ast = jade.parse(str, options);
+    console.log("\nAST:\n" + lineify(ast.pretty(), (options.filename || '') + '[AST]:'));
+  }
+  return output;
 }
 
 /**
@@ -141,24 +175,26 @@ function renderFile(path) {
     if (err) throw err;
     // Found jade file
     if (stat.isFile() && re.test(path)) {
-      fs.readFile(path, 'utf8', function(err, str){
+      fs.readFile(path, 'utf8', function(err, str) {
         if (err) throw err;
         options.filename = path;
-        var fn = jade.compile(str, options);
-        var extname = options.client ? '.js' : '.html';
-        path = path.replace(re, extname);
-        if (program.out) path = join(program.out, basename(path));
-        var dir = resolve(dirname(path));
-        mkdirp(dir, 0755, function(err){
-          if (err) throw err;
-          var output = options.client
-            ? fn.toString()
-            : fn(options);
-          fs.writeFile(path, output, function(err){
+        var output = getOutput(str, options);
+
+        if (program.stdout) {
+          console.log(output);
+        } else {
+          var extname = options.client ? '.js' : '.html';
+          path = path.replace(re, extname);
+          if (program.out) path = join(program.out, basename(path));
+          var dir = resolve(dirname(path));
+          mkdirp(dir, 0755, function(err){
             if (err) throw err;
-            console.log('  \033[90mrendered \033[36m%s\033[0m', path);
+            fs.writeFile(path, output, function(err){
+              if (err) throw err;
+              console.log('  \033[90mrendered \033[36m%s\033[0m', path);
+            });
           });
-        });
+        }
       });
     // Found directory
     } else if (stat.isDirectory()) {
