@@ -6,7 +6,9 @@
 var jade = require('../')
   , fs = require('fs')
   , Coffee = require('coffee-script')
-  , vm = require('vm');
+  , vm = require('vm')
+  , FakeDocument = require('./fakeDocument')
+  , util = require('util')
 
 // test cases
 
@@ -66,7 +68,7 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
       var ctx = vm.Script.createContext()
       var fn = vm.runInContext(js, ctx)
       var rt = jade.runtime;
-      var actual = fn({ title: 'Jade', interpolated: 'blah blah' }, rt.attrs, rt.escape, rt.rethrow, rt.merge);
+      var actual = fn({ title: 'Jade', interpolated: 'blah blah' }, rt);
       actual.trim().should.equal(html);
     } catch (e) {
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true, coffee: true });
@@ -77,3 +79,52 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
     }
   })
 });
+
+var k = 0;
+casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
+  if (k++ > 20) {
+    //return;
+  }
+  it("RawDomC: " + test.name, function(){
+    var str = fs.readFileSync(test.jade_path, 'utf8');
+    var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
+    var coffee = jade.compile(str, { filename: test.jade_path, coffee: true, rawdom: true });
+    var n = 0;
+    var js, ctx, fn, rt, nodes, actual;
+    var nodeList;
+    try {
+      js = Coffee.compile(coffee, {bare: true})
+      global.document = FakeDocument;
+      ctx = vm.Script.createContext({document: FakeDocument})
+      fn = vm.runInContext(js, ctx)
+      rt = jade.runtime;
+      nodes = fn({ title: 'Jade', interpolated: 'blah blah'}, rt);
+      actual = nodes.toHtml();
+
+      // Hack, since classList can't represent the difference between 'class' being "undefined" vs "empty string"
+      html = html.replace(' class=""', '');
+
+      actual.trim().should.equal(html);
+    } catch (e) {
+      if(e === 'Fail') {
+        console.log("Skipping " + test.jade_path);
+        return;
+      }
+      var ast = jade.parse(str, { filename: test.jade_path, pretty: true, coffee: true });
+      var altjs = jade.compile(str, { filename: test.jade_path, pretty: false, source: true, compileDebug: false});
+      console.log("\nJade:\n" + lineify(str, test.name + '[Jade]:'));
+      console.log("\nAST:\n" + lineify(ast.pretty(), test.name + '[AST]:'));
+      console.log("\nCoffeeScript:\n" + lineify(coffee, test.name + '[Coffee]:'));
+      console.log("\nJavaScript:\n" + lineify(js, test.name + '[JS]:'));
+      console.log("\nNormalJadeOutput:\n" + lineify(altjs, test.name + '[NORM]:'));
+      console.log("\nNodeList:\n" + lineify(util.inspect(nodeList, false, 99), test.name + '[NodeList]:'));
+      console.log("\nRAW_TXT1: \n" + JSON.stringify(actual));
+      console.log("\nRAW_TXT2: \n" + JSON.stringify(html));
+      throw e
+    } finally {
+      delete global.document;
+    }
+  })
+});
+
+
