@@ -101,45 +101,8 @@ class Element extends DocumentFragment
     idx = @attributes[key]
     @attributes[idx] = [key, val]
 
-  canInline: ->
-    return @childNodes.every isInline = (el) ->
-      return true if el instanceof TextNode
-      return false unless el instanceof Element
-      return false unless InlineTags[el.tag]
-      last = false
-      for n in el.childNodes
-        if n instanceof TextNode
-          return false if last
-          last = true
-        else
-          last = false
-          return false unless n.canInline()
-      return true
-#  function isInline(node){
-#    // Recurse if the node is a block
-#    if (node.isBlock) return node.nodes.every(isInline);
-#    return node.isText || (node.isInline && node.isInline());
-#  }
-#
-#  // Empty tag
-#  if (!nodes.length) return true;
-#
-#  // Text-only or inline-only tag
-#  if (1 == nodes.length) return isInline(nodes[0]);
-#
-#  // Multi-line inline-only tag
-#  if (this.block.nodes.every(isInline)) {
-#    for (var i = 1, len = nodes.length; i < len; ++i) {
-#      if (nodes[i-1].isText && nodes[i].isText)
-#        return false;
-#    }
-#    return true;
-#  }
-#
-#  // Mixed tag
-#  return false;
-#};
-
+  testHookPrettyPrint: ->
+    @test_hook_pretty_print = true
 
   toHtml: (indent = "") ->
     content = ""
@@ -163,7 +126,7 @@ class Element extends DocumentFragment
     for child in @childNodes
       content += child.toHtml(indent + "  ")
 
-    unless InlineTags[@tag] || @tag == 'pre' || @canInline()
+    if @test_hook_pretty_print
       content += "\n#{indent}"
 
     content += "</#{@tag}>"

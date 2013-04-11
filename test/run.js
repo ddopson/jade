@@ -25,6 +25,11 @@ function lineify(str, prefix) {
   return str.replace(/^/mg, function () { return prefix + three_digits(++n) + "  "});
 }
 
+function debug_output(prefix, text) {
+  console.log();
+  console.log(lineify(text, prefix));
+}
+
 function casesForExt(path, ext) {
   return fs.readdirSync(path).filter(function(file){
     return file.match(ext)
@@ -88,7 +93,7 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
   it("RawDomC: " + test.name, function(){
     var str = fs.readFileSync(test.jade_path, 'utf8');
     var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
-    var coffee = jade.compile(str, { filename: test.jade_path, coffee: true, rawdom: true });
+    var coffee = jade.compile(str, { filename: test.jade_path, coffee: true, rawdom: true, testHookPrettyPrint: true });
     var n = 0;
     var js, ctx, fn, rt, nodes, actual;
     var nodeList;
@@ -112,14 +117,15 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
       }
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true, coffee: true });
       var altjs = jade.compile(str, { filename: test.jade_path, pretty: false, source: true, compileDebug: false});
-      console.log("\nJade:\n" + lineify(str, test.name + '[Jade]:'));
-      console.log("\nAST:\n" + lineify(ast.pretty(), test.name + '[AST]:'));
-      console.log("\nCoffeeScript:\n" + lineify(coffee, test.name + '[Coffee]:'));
-      console.log("\nJavaScript:\n" + lineify(js, test.name + '[JS]:'));
-      console.log("\nNormalJadeOutput:\n" + lineify(altjs, test.name + '[NORM]:'));
-      console.log("\nNodeList:\n" + lineify(util.inspect(nodeList, false, 99), test.name + '[NodeList]:'));
-      console.log("\nRAW_TXT1: \n" + JSON.stringify(actual));
-      console.log("\nRAW_TXT2: \n" + JSON.stringify(html));
+      debug_output(test.name + '[Jade]:', str)
+      debug_output(test.name + '[AST]:', ast.pretty())
+      debug_output(test.name + '[Coffee]:', coffee)
+      //debug_output(test.name + '[JS]:', js)
+      debug_output(test.name + '[NodeList]:', util.inspect(nodes, false, 99))
+      debug_output(test.name + '[NORM]:', altjs)
+      debug_output(test.name + '[Output]:', actual)
+      debug_output(test.name + '[Expect]:', html)
+
       throw e
     } finally {
       delete global.document;
