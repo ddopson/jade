@@ -92,13 +92,12 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
 var k = 0;
 casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
   k++
-  //if (k != 78) return;
+  //if (k != 73) return;
 
   it("RawDomC" + k +": " + test.name, function(){
     var str = fs.readFileSync(test.jade_path, 'utf8');
     var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
-    var coffee = jade.compile(str, {
-      filename: test.jade_path, coffee: true, rawdom: true, pretty: true, testHookPrettyPrint: true });
+    var coffee = jade.compile(str, {filename: test.jade_path, coffee: true, rawdom: true, pretty: true, testHooks: true});
     var n = 0;
     var js, ctx, fn, rt, nodes, actual;
     var nodeList;

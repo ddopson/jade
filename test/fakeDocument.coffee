@@ -1,11 +1,4 @@
-InlineTags = {}
 HtmlParser = require './htmlparser'
-for tag in require('../lib/inline-tags')
-  InlineTags[tag] = true
-SelfClosingTags = {}
-for tag in require '../lib/self-closing'
-  SelfClosingTags[tag] = true
-
 JadeRt = require '../lib/runtime'
 Jade = require '../lib/jade'
 
@@ -120,7 +113,7 @@ class Element extends DocumentFragment
     if (clazz = @classList.toString()) != ""
       content += " class=\"#{clazz}\""
 
-    if @childNodes.length == 0 && SelfClosingTags[@tag]
+    if @test_hook_is_self_closing
       content += "/>"
     else
       content += ">"
@@ -129,6 +122,8 @@ class Element extends DocumentFragment
       content += "</#{@tag}>"
 
     return content
+  testHookSelfClosing: ->
+    @test_hook_is_self_closing = true
 
 class TextNode
   constructor: (@txt) ->
