@@ -108,16 +108,8 @@ class Element extends DocumentFragment
     idx = @attributes[key]
     @attributes[idx] = [key, val]
 
-  testHookPrettyPrint: ->
-    @test_hook_pretty_print = true
-
   toHtml: (indent = "") ->
-    content = ""
-    unless InlineTags[@tag]
-      # wtf TJ.  why so complex/bizare on the pretty print logic?
-      content += "\n#{indent}"
-
-    content += "<#{@tag}"
+    content = "<#{@tag}"
     for attr in @attributes
       [key, val] = attr
       if key.indexOf('data') == 0 and is_valid_json(val)
@@ -132,14 +124,10 @@ class Element extends DocumentFragment
       content += "/>"
     else
       content += ">"
-
       for child in @childNodes
         content += child.toHtml(indent + "  ")
-
-      if @test_hook_pretty_print
-        content += "\n#{indent}"
-
       content += "</#{@tag}>"
+
     return content
 
 class TextNode
