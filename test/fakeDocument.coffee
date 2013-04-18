@@ -2,6 +2,10 @@ InlineTags = {}
 HtmlParser = require './htmlparser'
 for tag in require('../lib/inline-tags')
   InlineTags[tag] = true
+SelfClosingTags = {}
+for tag in require '../lib/self-closing'
+  SelfClosingTags[tag] = true
+
 JadeRt = require '../lib/runtime'
 
 
@@ -51,8 +55,11 @@ class DocumentFragment
   appendChild: (el) ->
     if el.constructor == DocumentFragment
       @childNodes = @childNodes.concat(el.childNodes)
+      for n in el.childNodes
+        n.parent = @
     else
       @childNodes.push(el)
+      el.parent = @
 
     return el
 
@@ -91,7 +98,6 @@ class Element extends DocumentFragment
 
         comment: (text) ->
           parent.appendChild(new CommentNode(text))
-      console.log "Contents after", require('util').inspect(@)
 
     return @
 
@@ -121,21 +127,28 @@ class Element extends DocumentFragment
     if (clazz = @classList.toString()) != ""
       content += " class=\"#{clazz}\""
 
-    content += ">"
+    if @childNodes.length == 0 && SelfClosingTags[@tag]
+      content += "/>"
+    else
+      content += ">"
 
-    for child in @childNodes
-      content += child.toHtml(indent + "  ")
+      for child in @childNodes
+        content += child.toHtml(indent + "  ")
 
-    if @test_hook_pretty_print
-      content += "\n#{indent}"
+      if @test_hook_pretty_print
+        content += "\n#{indent}"
 
-    content += "</#{@tag}>"
+      content += "</#{@tag}>"
     return content
 
 class TextNode
   constructor: (@txt) ->
   toHtml: ->
-    JadeRt.escape(@txt)
+    if @parent.tag == 'script'
+      # Don't unescape text on script nodes
+      @txt
+    else
+      JadeRt.escape(@txt)
 
 class CommentNode
   constructor: (@txt) ->

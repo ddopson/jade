@@ -25,6 +25,10 @@ function lineify(str, prefix) {
   return str.replace(/^/mg, function () { return prefix + three_digits(++n) + "  "});
 }
 
+function debug_header(filename) {
+  console.log("\n\n\n");
+}
+
 function debug_output(prefix, text) {
   console.log();
   console.log(lineify(text, prefix));
@@ -87,13 +91,14 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
 
 var k = 0;
 casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
-  if (k++ > 20) {
-    //return;
-  }
-  it("RawDomC: " + test.name, function(){
+  k++
+  //if (k != 78) return;
+
+  it("RawDomC" + k +": " + test.name, function(){
     var str = fs.readFileSync(test.jade_path, 'utf8');
     var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
-    var coffee = jade.compile(str, { filename: test.jade_path, coffee: true, rawdom: true, testHookPrettyPrint: true });
+    var coffee = jade.compile(str, {
+      filename: test.jade_path, coffee: true, rawdom: true, pretty: true, testHookPrettyPrint: true });
     var n = 0;
     var js, ctx, fn, rt, nodes, actual;
     var nodeList;
@@ -116,7 +121,8 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
         return;
       }
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true, coffee: true });
-      var altjs = jade.compile(str, { filename: test.jade_path, pretty: false, source: true, compileDebug: false});
+      var altjs = jade.compile(str, { filename: test.jade_path, pretty: true, source: true, compileDebug: false});
+      debug_header(test.name)
       debug_output(test.name + '[Jade]:', str)
       debug_output(test.name + '[AST]:', ast.pretty())
       debug_output(test.name + '[Coffee]:', coffee)
