@@ -7,6 +7,7 @@ for tag in require '../lib/self-closing'
   SelfClosingTags[tag] = true
 
 JadeRt = require '../lib/runtime'
+Jade = require '../lib/jade'
 
 
 class Document
@@ -148,7 +149,10 @@ class TextNode
       # Don't unescape text on script nodes
       @txt
     else
-      JadeRt.escape(@txt)
+      @txt
+        .replace(/&(?!\w+;)/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
 
 class CommentNode
   constructor: (@txt) ->
