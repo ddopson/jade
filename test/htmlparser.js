@@ -179,7 +179,7 @@
         // Close all the open elements, up the stack
         for ( var i = stack.length - 1; i >= pos; i-- )
           if ( handler.end )
-            handler.end( stack[ i ] );
+            handler.end( stack[ i ], tagName == stack[i] );
 
         // Remove the open elements from the stack
         stack.length = pos;

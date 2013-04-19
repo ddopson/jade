@@ -45,45 +45,71 @@ function casesForExt(path, ext) {
     }
   });
 }
-
+var LOCALS = {
+  title: 'Jade',
+  name: 'jade',
+  name_null: null,
+  code: '<script>',
+  interpolated: 'blah blah'
+};
+var k = 0;
 casesForExt('test/cases', /[.]jade(js)?$/).forEach(function(test){
-  it("JadeJS: " + test.name, function(){
+  k++
+  //if (k != 25) return;
+  it("JadeJS"+k+": " + test.name, function(){
+    var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
+    var str = fs.readFileSync(test.jade_path, 'utf8');
+    var actual;
+    //var fn = jade.compile(str, { filename: test.jade_path, pretty: true });
     try {
-      var str = fs.readFileSync(test.jade_path, 'utf8');
-      var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
-      var fn = jade.compile(str, { filename: test.jade_path, pretty: true });
-      var actual = fn({ title: 'Jade' });
-      actual.trim().should.equal(html);
+      var js = jade.compile(str, { filename: test.jade_path, pretty: true, source: true, compileDebug: false});
+      js = '(function (locals, __jade){\n' + js.replace(/^/gm, '  ') + '\n})';
+      var ctx = vm.Script.createContext()
+      var fn = vm.runInContext(js, ctx)
+
+      actual = fn(LOCALS, jade.runtime);
+      actual = actual.trim();
+      actual.should.equal(html);
     } catch (e) {
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true});
-      var js = jade.compile(str, { filename: test.jade_path, pretty: true, source: true});
-      //console.log("\nAST:\n" + lineify(JSON.stringify(ast, true, '  '), test.name + '[AST]:'));
-      console.log("\nAST:\n" + lineify(ast.pretty(), test.name + '[AST]:'));
-      console.log("\nJavaScript:\n" + lineify(""+js, test.name + '[JS]:'));
+      var js2 = jade.compile(str, { filename: test.jade_path, pretty: true, source: true, compileDebug: false});
+      debug_header(test.name)
+      debug_output(test.name + '[Jade]:', str)
+      debug_output(test.name + '[AST]:', ast.pretty())
+      debug_output(test.name + '[JS]:', js2)
+      debug_output(test.name + '[Output]:', actual)
+      debug_output(test.name + '[Expect]:', html)
       throw e
     }
   })
 });
 
+var k = 0
 casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
-  it("JadeC: " + test.name, function(){
+  k++
+  //if (k != 27) return;
+  it("JadeC"+k+": " + test.name, function(){
     var str = fs.readFileSync(test.jade_path, 'utf8');
     var html = fs.readFileSync(test.html_path, 'utf8').trim().replace(/\r/g, '');
     var coffee = jade.compile(str, { filename: test.jade_path, pretty: true, coffee: true });
     var n = 0;
-    var js
+    var js, actual;
     try {
       js = Coffee.compile(coffee, {bare: true})
       var ctx = vm.Script.createContext()
       var fn = vm.runInContext(js, ctx)
-      var rt = jade.runtime;
-      var actual = fn({ title: 'Jade', interpolated: 'blah blah' }, rt);
-      actual.trim().should.equal(html);
+      actual = fn(LOCALS, jade.runtime);
+      actual = actual.trim();
+      actual.should.equal(html);
     } catch (e) {
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true, coffee: true });
-      console.log("\nAST:\n" + lineify(ast.pretty(), test.name + '[AST]:'));
-      console.log("\nCoffeeScript:\n" + lineify(coffee, test.name + '[Coffee]:'));
-      console.log("\nJavaScript:\n" + lineify(js, test.name + '[JS]:'));
+      debug_header(test.name)
+      debug_output(test.name + '[Jade]:', str)
+      debug_output(test.name + '[AST]:', ast.pretty())
+      debug_output(test.name + '[Coffee]:', coffee)
+      //debug_output(test.name + '[JS]:', js)
+      debug_output(test.name + '[Output]:', actual)
+      debug_output(test.name + '[Expect]:', html)
       throw e
     }
   })
@@ -92,7 +118,7 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
 var k = 0;
 casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
   k++
-  //if (k != 73) return;
+  //if (k != 79) return;
 
   it("RawDomC" + k +": " + test.name, function(){
     var str = fs.readFileSync(test.jade_path, 'utf8');
@@ -106,14 +132,13 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
       global.document = FakeDocument;
       ctx = vm.Script.createContext({document: FakeDocument})
       fn = vm.runInContext(js, ctx)
-      rt = jade.runtime;
-      nodes = fn({ title: 'Jade', interpolated: 'blah blah'}, rt);
+      nodes = fn(LOCALS, jade.runtime);
       actual = nodes.toHtml();
-
+      actual = actual.trim();
       // Hack, since classList can't represent the difference between 'class' being "undefined" vs "empty string"
       html = html.replace(' class=""', '');
 
-      actual.trim().should.equal(html);
+      actual.should.equal(html);
     } catch (e) {
       if(e === 'Fail') {
         console.log("Skipping " + test.jade_path);
@@ -127,7 +152,7 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
       debug_output(test.name + '[Coffee]:', coffee)
       //debug_output(test.name + '[JS]:', js)
       debug_output(test.name + '[NodeList]:', util.inspect(nodes, false, 99))
-      debug_output(test.name + '[NORM]:', altjs)
+      //debug_output(test.name + '[NORM]:', altjs)
       debug_output(test.name + '[Output]:', actual)
       debug_output(test.name + '[Expect]:', html)
 

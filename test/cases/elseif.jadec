@@ -1,0 +1,9 @@
+- users = ["tobi", "jane", "loki"]
+for user in users
+  if user == "tobi"
+    p awesome #{user}
+  else if user == "jane"
+    p lame #{user}
+  else
+    p #{user}
+

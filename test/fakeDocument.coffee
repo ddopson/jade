@@ -81,10 +81,12 @@ class Element extends DocumentFragment
           unless unary
             stack.push parent
             parent = el
-        end: (tag) ->
+
+        end: (tag, explicit) ->
           unless parent.tag == tag
             throw new Error("uhoh, this shouldn't happen")
 
+          parent.html_no_close = true unless explicit
           parent = stack.pop()
 
         chars: (text) ->
@@ -119,7 +121,7 @@ class Element extends DocumentFragment
       content += ">"
       for child in @childNodes
         content += child.toHtml(indent + "  ")
-      content += "</#{@tag}>"
+      content += "</#{@tag}>" unless @html_no_close
 
     return content
   testHookSelfClosing: ->
