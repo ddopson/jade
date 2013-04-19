@@ -132,9 +132,10 @@ class TextNode
   toHtml: ->
     if @parent.tag == 'script'
       # Don't unescape text on script nodes
-      @txt
+      ('' + @txt)
     else
-      @txt
+      # The browser autoconverts numbers, etc to strings when we create TextNode objects
+      ('' + @txt)
         .replace(/&(?!\w+;)/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
