@@ -1,7 +1,7 @@
 HtmlParser = require './htmlparser'
 JadeRt = require '../lib/runtime'
 Jade = require '../lib/jade'
-
+Util = require 'util'
 
 class Document
   createElement: (tag) ->
@@ -69,7 +69,16 @@ class Element extends DocumentFragment
     @attributes = []
     @classList = new ClassList()
 
+    @__defineGetter__ 'innerHTML', (html) => '__APPEND__'
     @__defineSetter__ 'innerHTML', (html) =>
+      # The 'value' of the innerHTML prop is '__APPEND__', so if we see that, we know it's a "+=" op
+      # Thus, when we do .innerHTML += "html", JS will prepend '__APPEND__' to "html" and call this setter method
+      if html.indexOf('__APPEND__') == 0
+        # Element.innerHTML += XXX
+        html = html.slice('__APPEND__'.length)
+      else
+        # Element.innerHTML = XXX
+        @childNodes = []
       stack = []
       parent = @
       HtmlParser.HTMLParser html,
@@ -90,6 +99,7 @@ class Element extends DocumentFragment
           parent = stack.pop()
 
         chars: (text) ->
+          return if (typeof text != 'string' || text.length == 0)
           parent.appendChild(new TextNode(text))
 
         comment: (text) ->
