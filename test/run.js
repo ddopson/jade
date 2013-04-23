@@ -101,7 +101,7 @@ casesForExt('JadeJS', 'test/cases', /[.]jade(js)?$/).forEach(function(test){
       actual = fn(LOCALS, jade.runtime);
       actual = actual.trim();
       actual.should.equal(html);
-    } catch (e) {
+    } catch (ex) {
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true});
       var js2 = jade.compile(str, { filename: test.jade_path, pretty: true, source: true, compileDebug: false});
       debug_header(test.name)
@@ -110,7 +110,8 @@ casesForExt('JadeJS', 'test/cases', /[.]jade(js)?$/).forEach(function(test){
       debug_output(test.name + '[JS]:', js2)
       debug_output(test.name + '[Output]:', actual)
       debug_output(test.name + '[Expect]:', html)
-      throw e
+      debug_output(test.name + '[Error]:', ex.stack)
+      throw ex
     }
   })
 });
@@ -128,7 +129,7 @@ casesForExt('JadeC', 'test/cases', /[.]jade(c)?$/).forEach(function(test){
       actual = fn(LOCALS, jade.runtime);
       actual = actual.trim();
       actual.should.equal(html);
-    } catch (e) {
+    } catch (ex) {
       var ast = jade.parse(str, { filename: test.jade_path, pretty: true, coffee: true });
       debug_header(test.name)
       debug_output(test.name + '[Jade]:', str)
@@ -137,7 +138,8 @@ casesForExt('JadeC', 'test/cases', /[.]jade(c)?$/).forEach(function(test){
       //debug_output(test.name + '[JS]:', js)
       debug_output(test.name + '[Output]:', actual)
       debug_output(test.name + '[Expect]:', html)
-      throw e
+      debug_output(test.name + '[Error]:', ex.stack)
+      throw ex
     }
   })
 });
@@ -163,8 +165,8 @@ casesForExt('RawDomC', 'test/cases', /[.]jade(c)?$/).forEach(function(test){
       html = html.replace(' class=""', '');
 
       actual.should.equal(html);
-    } catch (e) {
-      if(e === 'Fail') {
+    } catch (ex) {
+      if(ex === 'Fail') {
         console.log("Skipping " + test.jade_path);
         return;
       }
@@ -179,8 +181,9 @@ casesForExt('RawDomC', 'test/cases', /[.]jade(c)?$/).forEach(function(test){
       //debug_output(test.name + '[NORM]:', altjs)
       debug_output(test.name + '[Output]:', actual)
       debug_output(test.name + '[Expect]:', html)
+      debug_output(test.name + '[Error]:', ex.stack)
 
-      throw e
+      throw ex
     } finally {
       delete global.document;
     }
