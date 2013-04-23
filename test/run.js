@@ -9,6 +9,7 @@ var jade = require('../')
   , vm = require('vm')
   , FakeDocument = require('./fakeDocument')
   , util = require('util')
+  , parseJSExpression = require('character-parser').parseMax
 
 // test cases
 
@@ -36,22 +37,37 @@ function debug_output(prefix, text) {
 
 function coffee_hacks(str) {
   // These are hacks to sanitize some Jade-syntax code automatically
-  return str.replace(/^(\s+)- var /gm, '$1- ')
+  return str
+    .replace(/^(\s*)-\s*var /gm, '$1- ')
+    .replace(/function\s*(\w*)\s*\(([^)]*)\)\s*\{(.*)/, function (str, name, args, code) {
+      var range = parseJSExpression(code);
+      var content = '(';
+      if (name.length > 0) {
+        content += name + ' = ';
+      }
+      content += '(' + args + ') -> ' + range.src
+      content += ')' + code.substr(range.end + 1);
+      return content;
+    });
 }
 
-function casesForExt(path, ext) {
+function casesForExt(name, path, ext) {
+  var idx = 0;
   return fs.readdirSync(path).filter(function(file){
     return file.match(ext)
   }).map(function(file){
+    ++idx;
     return {
       name: file.replace(ext, ''), // .replace(/[-.]/g, ' '),
+      it_name: name + idx + ': ' + file.replace(ext, ''),
+      idx: idx,
       jade_path: path + '/' + file,
       html_path: path + '/' + file.replace(ext, '.html'),
       jadeText: function (opts) {
         var text = fs.readFileSync(this.jade_path, 'utf8')
         if (opts && opts.coffee) {
           // stripping out the 'var' keyword from declarations fixes many templates automatically
-          text = text.replace(/^(\s+)- var /gm, '$1- ');
+          text = coffee_hacks(text);
         }
         return text;
       },
@@ -61,6 +77,7 @@ function casesForExt(path, ext) {
     };
   });
 }
+
 var LOCALS = {
   title: 'Jade',
   name: 'jade',
@@ -68,20 +85,18 @@ var LOCALS = {
   code: '<script>',
   interpolated: 'blah blah'
 };
-var k = 0;
-casesForExt('test/cases', /[.]jade(js)?$/).forEach(function(test){
-  k++
-  //if (k != 25) return;
-  it("JadeJS"+k+": " + test.name, function(){
+
+var CONTEXT = vm.Script.createContext({document: FakeDocument})
+
+casesForExt('JadeJS', 'test/cases', /[.]jade(js)?$/).forEach(function(test){
+  it(test.it_name, function(){
     var str = test.jadeText();
     var html = test.htmlText();
     var actual;
-    //var fn = jade.compile(str, { filename: test.jade_path, pretty: true });
     try {
       var js = jade.compile(str, { filename: test.jade_path, pretty: true, source: true, compileDebug: false});
       js = '(function (locals, __jade){\n' + js.replace(/^/gm, '  ') + '\n})';
-      var ctx = vm.Script.createContext()
-      var fn = vm.runInContext(js, ctx)
+      var fn = vm.runInContext(js, CONTEXT)
 
       actual = fn(LOCALS, jade.runtime);
       actual = actual.trim();
@@ -100,11 +115,8 @@ casesForExt('test/cases', /[.]jade(js)?$/).forEach(function(test){
   })
 });
 
-var k = 0
-casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
-  k++
-  //if (k != 27) return;
-  it("JadeC"+k+": " + test.name, function(){
+casesForExt('JadeC', 'test/cases', /[.]jade(c)?$/).forEach(function(test){
+  it(test.it_name, function(){
     var str = test.jadeText({coffee: true});
     var html = test.htmlText();
     var coffee = jade.compile(str, { filename: test.jade_path, pretty: true, coffee: true });
@@ -112,8 +124,7 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
     var js, actual;
     try {
       js = Coffee.compile(coffee, {bare: true})
-      var ctx = vm.Script.createContext()
-      var fn = vm.runInContext(js, ctx)
+      var fn = vm.runInContext(js, CONTEXT)
       actual = fn(LOCALS, jade.runtime);
       actual = actual.trim();
       actual.should.equal(html);
@@ -131,24 +142,20 @@ casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
   })
 });
 
-var k = 0;
-casesForExt('test/cases', /[.]jade(c)?$/).forEach(function(test){
-  k++
-  if([10, 23, 24, 25, 29, 30, 31, 32, 33, 34, 35, 36, 38, 46, 47, 61, 64].indexOf(k) != -1) return;
-  //if (k != 79) return;
+casesForExt('RawDomC', 'test/cases', /[.]jade(c)?$/).forEach(function(test){
+  if([10, 23, 24, 25, 29, 30, 31, 32, 33, 34, 35, 36, 38, 46, 47, 61, 64].indexOf(test.idx) != -1) return;
 
-  it("RawDomC" + k +": " + test.name, function(){
+  it(test.it_name, function(){
     var str = test.jadeText({coffee: true});
     var html = test.htmlText();
     var coffee = jade.compile(str, {filename: test.jade_path, coffee: true, rawdom: true, pretty: true, testHooks: true});
     var n = 0;
-    var js, ctx, fn, rt, nodes, actual;
+    var js, fn, rt, nodes, actual;
     var nodeList;
     try {
       js = Coffee.compile(coffee, {bare: true})
       global.document = FakeDocument;
-      ctx = vm.Script.createContext({document: FakeDocument})
-      fn = vm.runInContext(js, ctx)
+      fn = vm.runInContext(js, CONTEXT)
       nodes = fn(LOCALS, jade.runtime);
       actual = nodes.toHtml();
       actual = actual.trim();
