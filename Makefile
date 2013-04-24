@@ -1,5 +1,5 @@
 
-SRC = $(shell find lib -name "*.js" -type f)
+SRC = $(shell find lib -name "*.js" -type f) node_modules/character-parser/index.js
 UGLIFY = $(shell find node_modules -name "uglifyjs" -type f)
 UGLIFY_FLAGS = --no-mangle
 REPORTER = dot
@@ -20,7 +20,7 @@ benchmark:
 	@node support/benchmark
 
 jade.js: $(SRC)
-	@node support/compile.js $^
+	node support/compile.js $^
 
 jade.min.js: jade.js
 	@$(UGLIFY) $(UGLIFY_FLAGS) $< > $@ \

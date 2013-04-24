@@ -97,6 +97,7 @@ function compile() {
   args.forEach(function(file){
     var js = files[file];
     file = file.replace('lib/', '');
+    file = file.replace(/node_modules\/([\w-_]+)\/index.js/, '$1')
     buf += '\nrequire.register("' + file + '", function(module, exports, require){\n';
     buf += js;
     buf += '\n}); // module: ' + file + '\n';
