@@ -104,6 +104,7 @@ function compile() {
   });
   buf += '\nreturn require("jade");\n';
   buf += '})();\n';
+  buf += 'if (window) { window.jade = jade; };\n';
   fs.writeFile('jade.js', buf, function(err){
     if (err) throw err;
     console.log('  \033[90m create : \033[0m\033[36m%s\033[0m', 'jade.js');
