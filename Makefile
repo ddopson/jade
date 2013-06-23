@@ -4,7 +4,7 @@ UGLIFY = $(shell find node_modules -name "uglifyjs" -type f)
 UGLIFY_FLAGS = --no-mangle
 REPORTER = dot
 
-all: jade.min.js runtime.min.js
+all: jade.min.js runtime.min.js test
 
 test:
 	@./node_modules/.bin/mocha \
@@ -23,8 +23,7 @@ jade.js: $(SRC)
 	node support/compile.js $^
 
 jade.min.js: jade.js
-	@$(UGLIFY) $(UGLIFY_FLAGS) $< > $@ \
-		&& du -bh jade.js jade.min.js
+	@$(UGLIFY) $(UGLIFY_FLAGS) $< > $@
 
 runtime.js: lib/runtime.js
 	@cat support/head.js $< support/foot.js > $@
