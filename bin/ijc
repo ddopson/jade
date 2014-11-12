@@ -30,10 +30,7 @@ program
   .option('-R, --rawdom', 'Compile in rawDOM syntax mode')
   .option('-s, --stdout', 'Print output to stdout')
   .option('-P, --pretty', 'compile pretty html output')
-  .option('-c, --client', 'compile function for client-side runtime.js')
-  .option('-D, --no-debug', 'compile without debugging (smaller functions)')
   .option('-x, --xml', 'Output well-formed xml.')
-  .option('--debug-ast', 'Output the parsed intermediate AST')
   .option('-w, --watch', 'watch files for changes and automatically re-render')
 
 program.on('--help', function(){
@@ -83,14 +80,6 @@ options.client = program.client;
 // --pretty
 
 options.pretty = program.pretty;
-
-// --coffee
-
-options.coffee = program.coffee;
-
-// --rawdom
-
-options.rawdom = program.rawdom;
 
 // --xml
 
@@ -151,19 +140,37 @@ function lineify(str, prefix) {
   return str.replace(/^/mg, function () { return prefix + three_digits(++n) + "  "});
 }
 
+var heredoc_regexp = new RegExp('^[ \\t]*(?=\\S)', 'gm')
+
 strip_heredoc = function(str) {
   var indent = 999999;
-  var ref = str.match(/^[ \t]*(?=\S)/g);
+  var ref = str.match(heredoc_regexp);
   for (var i = 0, len = ref.length; i < len; i++) {
     if (ref[i].length < indent) {
       indent = ref[i].length;
     }
   }
-  regex = new RegExp('^[ \t]{' + indent + '}', 'g');
+  regex = new RegExp('^[ \t]{' + indent + '}', 'gm');
   return str.replace(regex, '');
 };
 
+var first_line_regexp = new RegExp('(.*)'); // No /m flag.
+function injectCommentedTemplate(output, template_text) {
+  injected_template_text = "  # !ijc\n" + template_text.replace(/^/gm, '  # ');
+  return output.replace(first_line_regexp, '$1\n' + injected_template_text);
+}
+
 function getOutput(str, options) {
+  var options_ijc = {
+    locals: {},
+    client: true,
+    inline: true,
+    coffee: true,
+    rawdom: program.rawdom,
+    compileDebug: false,
+    filepath: program.path ? program.path : "(stdin)"
+  };
+
   regex_str = ""
   regex_str += '([ \\t]*)'                // capture leading indent ($1)
   regex_str += '([^\\n]*)'                // capture existing line, eg "template = " ($2)
@@ -175,19 +182,13 @@ function getOutput(str, options) {
   regex_str += '"""'                      // closing """ token
   regex = RegExp(regex_str, 'gm');
 
-  var options_ijc = {
-    locals: {},
-    client: true,
-    inline: true,
-    coffee: true,
-    compileDebug: false,
-  };
-
   return str.replace(RegExp(regex_str),
       function (match, indent, before_text, template_type, template_text) {
     if (template_type == "ijc") {
       output = before_text
-      output += jade.compile(strip_heredoc(template_text), options_ijc)
+      template_text_stripped = strip_heredoc(template_text)
+      ijc = jade.compile(template_text_stripped, options_ijc)
+      output += injectCommentedTemplate(ijc, template_text_stripped);
       output += ".call(@)"
       output = output.replace(/^/gm, indent)
       return output;
@@ -215,7 +216,7 @@ function renderFile(path) {
         if (program.stdout) {
           console.log(output);
         } else {
-          var extname = options.client ? '.js' : '.html';
+          var extname = '';
           path = path.replace(re, extname);
           if (program.out) path = join(program.out, basename(path));
           var dir = resolve(dirname(path));
